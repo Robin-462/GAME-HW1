@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags:
+  - Targetable
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Hidden Layer
+    uniqueID: 3720651001
+    locked: 0
+  - name: Background
+    uniqueID: 2007351675
+    locked: 0
+  - name: Foreground
+    uniqueID: 3190501979
+    locked: 0
+  - name: Projectiles
+    uniqueID: 432736809
+    locked: 0
+  - name: Hero Layer
+    uniqueID: 2981768529
+    locked: 0
