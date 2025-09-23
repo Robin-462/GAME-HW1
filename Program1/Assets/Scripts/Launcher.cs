@@ -26,6 +26,7 @@ public class Launcher : MonoBehaviour
 {
     // maximum torpedos that may be in play at a time
     private GameObject[] TorpedoArray;
+    private float nextFireTime = 0f;
     int index = 0;
 
     [Tooltip("Type of torpedo prefab fired by launcher")]
@@ -53,6 +54,8 @@ public class Launcher : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Return))
         {
+            if (Time.time < nextFireTime) return;
+
             Guidance guidance;
 
             index++;
@@ -62,16 +65,17 @@ public class Launcher : MonoBehaviour
             if (TorpedoArray[index] != null)
                 GameObject.Destroy(TorpedoArray[index]);
 
-            Vector4 position = transform.localToWorldMatrix * new Vector4 (0.0f, 1.0f, 0.0f, 1.0f);
+            Vector4 position = transform.localToWorldMatrix * new Vector4(0.0f, 1.0f, 0.0f, 1.0f);
             Quaternion rotation = Quaternion.identity;
 
             TorpedoArray[index] = Instantiate(TorpedoType, position, rotation) as GameObject;
-            
+
             // init guidance system to direction ship is facing
             guidance = TorpedoArray[index].GetComponent<Guidance>();
-            guidance.direction = (new Vector3 (position.x, position.y, position.z) - transform.position).normalized;
+            guidance.direction = (new Vector3(position.x, position.y, position.z) - transform.position).normalized;
 
             //Debug.Log("Torpedo direction is " + guidance.direction);
+            nextFireTime = Time.time + (1f / Mathf.Max(0.1f, RateOfFire));
         }
     }
 }
