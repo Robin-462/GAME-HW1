@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -18,9 +16,6 @@ using UnityEngine;
 /// selectively acquires targets and initiates an explosion
 /// upon impact. Torpedoes have a designer-specified time
 /// to live (TTL), after which they will cease to exist.
-///
-/// Hint: You will need to upgrade this system.
-/// 
 /// </summary>
 
 public class Guidance : MonoBehaviour
@@ -31,112 +26,149 @@ public class Guidance : MonoBehaviour
     [Tooltip("Direction of the torpedo")]
     public Vector3 direction = Vector3.zero;
 
-	[Tooltip("Maximum torpedo life in seconds")]
-	public float timeToLive = 6.0f;
+    [Tooltip("Maximum torpedo life in seconds")]
+    public float timeToLive = 6.0f;
 
-	[Tooltip("Time for torpedo to fade out in seconds")]
-	public float fadeTime = 0.5f;
+    [Tooltip("Time for torpedo to fade out in seconds")]
+    public float fadeTime = 0.5f;
 
-	GameObject[] potentialTargets = null;
-	GameObject targetObject = null;
-	Vector3    targetPoint  = Vector3.zero;
+    [Tooltip("Maximum number of reflections before torpedo expires")]
+    public int numberReflections = 2;
 
-	bool targetImpacted = false;
-	bool targetAcquired = false;
+    [Tooltip("Layers that trigger reflections")]
+    public LayerMask reflectiveLayers;
 
-	Vector3 startPos;
-	float t = 0.0f;
+    GameObject[] _potentialTargets;
+    Vector3 _targetPoint;
+    bool _targetImpacted;
+    bool _targetAcquired;
+    AudioSource _ricochetSound;
+    int _currentReflections = 0;
 
-	float tMax = 0.0f;
-
-    // Acquire a new target point
-    bool Acquire(out Vector3 target, ref GameObject targObj)
+    float MyDot(Vector2 a, Vector2 b)
     {
-        bool found = false;
-        target = Vector3.zero;
-
-        bool candFound = false;
-        Vector3 candTarget = Vector3.zero;
-
-        // finds the first applicable target in the list.
-        for (int i = 0; i < potentialTargets.Length && !found; i++)
-        {
-            //Debug.Log("Checking target " + potentialTargets[i].name);
-            candFound = potentialTargets[i].GetComponent<Targetable>().Intersect(out candTarget, transform.position, direction);
-
-            if (candFound)
-            {
-                found    = candFound;
-                target   = candTarget;
-				targObj  = potentialTargets[i];
-            }
-        }
-        return found;
+        return a.x * b.x + a.y * b.y;
     }
 
-	// Start is called before the first frame update
-	void Start()
+    Vector2 MyReflect(Vector2 incident, Vector2 normal)
     {
-		// assemble a list of all targets this torpedo may acquire
-		potentialTargets = GameObject.FindGameObjectsWithTag("Targetable");
+        float dot = MyDot(incident, normal);
+        return new Vector2(
+            incident.x - 2f * dot * normal.x,
+            incident.y - 2f * dot * normal.y
+        );
+    }
 
-		startPos = transform.position;
-	}
+    void Start()
+    {
+        _potentialTargets = GameObject.FindGameObjectsWithTag("Targetable");
 
-	// Update is called once per frame
-	void Update()
-	{
-		// decrement the lifetime counter for this tick
-		timeToLive -= Time.deltaTime;
-		//Debug.Log("Time to live: " + timeToLive);
+        AudioSource[] sounds = GetComponents<AudioSource>();
+        if (sounds.Length > 1) _ricochetSound = sounds[1];
+    }
 
-		// move until contact with target or out of gas
-		if (!targetImpacted && timeToLive > 0.001f)
-		{
-			if (!targetAcquired)
-			{
-				targetAcquired = Acquire(out targetPoint, ref targetObject);
+    void Update()
+    {
+        timeToLive -= Time.deltaTime;
 
-				//Debug.Log("Target acquired: " + targetAcquired + " at position " + targetPoint);
-			}
+        if (!_targetImpacted && timeToLive > 0.001f)
+        {
+            if (!_targetAcquired)
+            {
+                _targetAcquired = AcquireTarget();
+            }
 
+            CheckReflections();
 
-			// Note: The targeting logic below is imperfect and can cause the
-			// torpodo to "miss" its target under certain circumstances. Why?
-			//
-			// Upgrade this code by using LERP to move to torpedo to its target
-			// and detect collisions.
+            if (!_targetAcquired || Mathf.Abs((transform.position - _targetPoint).sqrMagnitude) > 0.002f)
+            {
+                transform.Translate(direction * velocity * Time.deltaTime);
+            }
+            else
+            {
+                _targetImpacted = true;
+                if (_ricochetSound != null) _ricochetSound.Play();
+                timeToLive = 0.5f;
+            }
+        }
 
-			float currentDist = Mathf.Abs((transform.position - targetPoint).sqrMagnitude);
+        if (timeToLive <= fadeTime)
+        {
+            SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
+            float newAlpha = spriteRenderer.color.a - (Time.deltaTime / fadeTime);
+            spriteRenderer.color = new Color(1.0f, 1.0f, 1.0f, newAlpha);
 
-			// Either there's no target, or we haven't yet impacted target. 
-			if (!targetAcquired || currentDist > 0.002f)
-			{
-				// just move along direction of travel indefinitely
-				transform.Translate(direction * velocity * Time.deltaTime);
-			}
-			else // we've hit an acquired target: reflect
-			{
-				targetImpacted = true;
+            if (timeToLive <= 0.001f)
+                Destroy(gameObject);
+        }
+    }
 
-				// contacted with targetable object; play ricochset sound
-				AudioSource ricochet = GetComponents<AudioSource>()[1];
-				ricochet.Play();
+    void CheckReflections()
+    {
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, 0.5f, reflectiveLayers);
+        if (hit.collider != null)
+        {
+            Reflect(hit);
+        }
+        else
+        {
+            CheckStarfieldBounds();
+        }
+    }
 
-				timeToLive = 0.5f;
-			}
-		}
+    void Reflect(RaycastHit2D hit)
+    {
+        if (_currentReflections >= numberReflections)
+        {
+            _targetImpacted = true;
+            timeToLive = 0.1f;
+            return;
+        }
 
-		if (timeToLive <= fadeTime)
-		{
-			SpriteRenderer renderer = GetComponent<SpriteRenderer>();
+        _currentReflections++;
 
-			// fade the torpedo out of existence
-			renderer.color = new Color (1.0f, 1.0f, 1.0f, (renderer.color.a - (Time.deltaTime / fadeTime)));
+        Vector2 incident = new Vector2(direction.x, direction.y);
+        Vector2 reflection = MyReflect(incident, hit.normal);
+        direction = new Vector3(reflection.x, reflection.y, 0f);
 
-			if (timeToLive <= 0.001f)
-				// remove the object from the game
-				GameObject.Destroy(gameObject);
-		}
+        if (_ricochetSound != null) _ricochetSound.Play();
+    }
+
+    void CheckStarfieldBounds()
+    {
+        if (Camera.main == null) return;
+
+        Vector3 viewportPos = Camera.main.WorldToViewportPoint(transform.position);
+        Vector2 normal = Vector2.zero;
+        bool hitBoundary = false;
+
+        if (viewportPos.x <= 0.02f) { normal = Vector2.right; hitBoundary = true; }
+        else if (viewportPos.x >= 0.98f) { normal = Vector2.left; hitBoundary = true; }
+        else if (viewportPos.y <= 0.02f) { normal = Vector2.up; hitBoundary = true; }
+        else if (viewportPos.y >= 0.98f) { normal = Vector2.down; hitBoundary = true; }
+
+        if (hitBoundary)
+        {
+            RaycastHit2D fakeHit = new RaycastHit2D();
+            fakeHit.normal = normal;
+            Reflect(fakeHit);
+        }
+    }
+
+    bool AcquireTarget()
+    {
+        Vector3 candTarget; 
+
+        for (int i = 0; i < _potentialTargets.Length; i++)
+        {
+            bool candFound = _potentialTargets[i].GetComponent<Targetable>().Intersect(out candTarget, transform.position, direction);
+            if (candFound)
+            {
+                _targetPoint = candTarget;
+                return true;
+            }
+        }
+
+        return false;
     }
 }
