@@ -9,7 +9,10 @@ Like, the ReteOfFire = 4 - fires every 0.25 seconds
           RateOfFire = 2 - fires every 0.5 seconds.
 3. Torpedo reflections
 - Torpedoes that hit a boundary will be reflected according to the laws of physics rather than disappearing.
+
 Core:
+
+
 - Control the maximum number of reflections using the numberReflections variable in the Inspector.
 - Use the reflection formula R = I - 2*(I·N)*N
 - Each reflection triggers a sound effect
